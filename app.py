@@ -9,7 +9,7 @@ from psycopg2.extras import RealDictCursor
 app = Flask(__name__)
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
-API_KEY = '878a60c5-afcc-4e01-8213-f93758ee3722'
+API_KEY = '878a60c5-afcc-4e01-8213-f03758ee3272'
 API_SECRET = '878a60c5-afcc-4e01-8213-f93758ee3272'
 REDIRECT_URI = 'https://anshu-new-1.onrender.com/callback'
 
