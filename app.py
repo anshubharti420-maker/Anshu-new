@@ -13,7 +13,7 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 
 # 2. AAPKI LATEST FIXED UPSTOX KEYS
 API_KEY = '878a60c5-afcc-4e01-8213-f03758ee3722'
-API_SECRET = '878a60c5-afcc-4e01-8213-f03758ee3272'  # <-- Aapki naye Secret Key yahan lock kar di hai
+API_SECRET = 'i1j86ouh44'  # <-- Aapki naye Secret Key yahan lock kar di hai
 REDIRECT_URI = 'https://anshu-new-1.onrender.com/callback'
 
 # Premium Segmented Cards Mock Model (BTST aur INTRADAY proper alignment ke sath)
