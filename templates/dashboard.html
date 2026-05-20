@@ -27,6 +27,10 @@
             </div>
             
             <div class="flex items-center space-x-3">
+                <span id="timerBadge" class="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-slate-800 text-cyan-400 border border-slate-700/60 uppercase tracking-wider">
+                    <i class="fa-solid fa-stopwatch mr-1"></i> Sync: 60s
+                </span>
+
                 <a href="/login-upstox" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center space-x-2 transition-all shadow-lg active:scale-95">
                     <i class="fa-solid fa-key"></i>
                     <span>Connect Upstox</span>
@@ -34,7 +38,7 @@
                 
                 <button onclick="refreshDashboard()" id="refreshBtn" class="bg-[#334155] hover:bg-slate-600 text-slate-200 font-semibold px-4 py-2 rounded-xl flex items-center space-x-2 transition-all border border-slate-700 shadow-md active:scale-95">
                     <i class="fa-solid fa-arrows-rotate" id="refreshIcon"></i>
-                    <span class="text-xs">Refresh Data</span>
+                    <span class="text-xs">Refresh</span>
                 </button>
             </div>
         </div>
@@ -120,11 +124,14 @@
     </main>
 
     <script>
+        let countdownTime = 60;
+        const timerBadge = document.getElementById('timerBadge');
+
         async function refreshDashboard() {
             const btn = document.getElementById('refreshBtn');
             const icon = document.getElementById('refreshIcon');
             icon.classList.add('fa-spin');
-            btn.disabled = true;
+            if(btn) btn.disabled = true;
             
             try {
                 const response = await fetch('/api/refresh');
@@ -142,7 +149,6 @@
                         if(stock.hit === true) hits++;
                         if(stock.hit === null) active++;
                         
-                        // Dynamic Badges UI customization
                         let badgeColor = stock.hit === true ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : (stock.hit === false ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20');
                         let badgeText = stock.hit === true ? 'TARGET DONE ✅' : (stock.hit === false ? 'SL HIT ❌' : 'LIVE RUNNING ⏳');
                         
@@ -158,7 +164,7 @@
                                 <td class="p-4 font-medium text-slate-300">${stock.strategy || 'CPR + Breakout'}</td>
                                 <td class="p-4"><span class="px-2 py-0.5 rounded-md text-xs font-extrabold ${typeColor}">${typeText}</span></td>
                                 <td class="p-4 font-mono font-semibold text-slate-200">₹${parseFloat(stock.price_at_signal).toFixed(2)}</td>
-                                <td class="p-4 font-mono font-bold text-cyan-400 animate-pulse">₹${parseFloat(stock.ltp || stock.price_at_signal).toFixed(2)}</td>
+                                <td class="p-4 font-mono font-bold text-cyan-400">₹${parseFloat(stock.ltp || stock.price_at_signal).toFixed(2)}</td>
                                 <td class="p-4 font-mono text-emerald-400 font-medium">₹${parseFloat(stock.target1 || (stock.price_at_signal * 1.01)).toFixed(2)}</td>
                                 <td class="p-4 font-mono text-emerald-300 font-medium">₹${parseFloat(stock.target2 || (stock.price_at_signal * 1.02)).toFixed(2)}</td>
                                 <td class="p-4 font-mono text-rose-400 font-medium">₹${parseFloat(stock.stop_loss || (stock.price_at_signal * 0.995)).toFixed(2)}</td>
@@ -177,10 +183,21 @@
             } finally {
                 setTimeout(() => {
                     icon.classList.remove('fa-spin');
-                    btn.disabled = false;
+                    if(btn) btn.disabled = false;
+                    countdownTime = 60; // Timer reset to 60 seconds after update
                 }, 600);
             }
         }
+
+        // ⏱️ Countdown Logic: Har second timer ghtega aur 0 par auto-refresh trigger hoga
+        setInterval(() => {
+            countdownTime--;
+            timerBadge.innerHTML = `<i class="fa-solid fa-stopwatch mr-1"></i> Sync: ${countdownTime}s`;
+            
+            if (countdownTime <= 0) {
+                refreshDashboard();
+            }
+        }, 1000);
 
         window.onload = refreshDashboard;
     </script>
