@@ -8,12 +8,14 @@ from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
 
+# DATABASE URL Render se hi load hoga jo ki perfect chal raha hai
 DATABASE_URL = os.environ.get('DATABASE_URL')
-API_KEY = os.environ.get('878a60c5-afcc-4e01-8213-f03758ee3272')
-API_SECRET = os.environ.get('wjgohe75mz')
-REDIRECT_URI = os.environ.get('UPSTOX_REDIRECT_URI', 'https://anshu-new-1.onrender.com/callback')
 
-# TEST STOCKS: Jab tak live market chal kar database me entries nahi aati, tab tak ye dikhenge
+# ASLI KEYS DIRECT CODE KE ANDAR (Bina kisi Environment Variable ke jhanjhat ke)
+API_KEY = '878a60c5-afcc-4e01-8213-f93758ee3722'
+API_SECRET = 'wjgohe75mz'  # <-- Bas single quotes ke andar apni Secret Key daal dein
+REDIRECT_URI = 'https://anshu-new-1.onrender.com/callback'
+
 MOCK_SIGNALS = [
     {"symbol": "RELIANCE", "signal_type": "INTRADAY", "direction": "UP", "price_at_signal": 2450.0, "signal_date": "2026-05-21", "actual_change_pct": 1.5, "hit": True},
     {"symbol": "TATASTEEL", "signal_type": "BTST", "direction": "UP", "price_at_signal": 164.2, "signal_date": "2026-05-21", "actual_change_pct": 2.1, "hit": True},
@@ -48,7 +50,7 @@ def check_and_create_table():
 
 @app.route('/login-upstox')
 def login_upstox():
-    url = f"https://api.upstox.com/v2/login/authorization/dialog?client_id={878a60c5-afcc-4e01-8213-f03758ee3272}&redirect_uri={https://anshu-new-1.onrender.com/callback}&response_type=code"
+    url = f"https://api.upstox.com/v2/login/authorization/dialog?client_id={API_KEY}&redirect_uri={REDIRECT_URI}&response_type=code"
     return redirect(url)
 
 @app.route('/callback')
@@ -76,8 +78,6 @@ def callback():
             
             if access_token:
                 check_and_create_table()
-                
-                # Upstox API se real-time data fetch karna
                 stock_instruments = "NSE_EQ|INE002A01018,NSE_EQ|INE040A01034"
                 quote_url = f'https://api.upstox.com/v2/market-quote/quotes?instrument_key={stock_instruments}'
                 
@@ -88,29 +88,22 @@ def callback():
                 
                 with urllib.request.urlopen(quote_req) as quote_response:
                     market_data = json.loads(quote_response.read().decode('utf-8'))
-                    
                     if market_data.get('status') == 'success' and DATABASE_URL:
                         data_body = market_data.get('data', {})
-                        
                         conn = psycopg2.connect(DATABASE_URL)
                         cur = conn.cursor()
-                        
                         for key, val in data_body.items():
                             symbol_name = val.get('symbol')
                             last_price = val.get('last_price')
-                            
                             cur.execute("""
                                 INSERT INTO public.signal_history (symbol, signal_type, direction, price_at_signal, signal_date, hit)
                                 VALUES (%s, 'INTRADAY', 'UP', %s, NOW(), True);
                             """, (symbol_name, last_price))
-                            
                         conn.commit()
                         cur.close()
                         conn.close()
-                        
     except Exception as e:
-        print("Error processing live data with urllib:", e)
-        
+        print("Error processing live data:", e)
     return redirect(url_for('index'))
 
 @app.route('/')
@@ -119,12 +112,10 @@ def index():
     direction = request.args.get('direction', '')
     signals = []
     total_signals, total_hits, accuracy = 0, 0, 0
-    
     try:
         check_and_create_table()
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
         cur = conn.cursor()
-        
         query = "SELECT id, symbol, signal_type, direction, price_at_signal, signal_date, actual_change_pct, hit FROM public.signal_history WHERE 1=1"
         params = []
         if signal_type:
@@ -132,24 +123,18 @@ def index():
         if direction:
             query += " AND direction = %s"; params.append(direction)
         query += " ORDER BY id DESC LIMIT 50"
-        
         cur.execute(query, params)
         signals = cur.fetchall()
-        
         cur.execute("SELECT COUNT(*) as total, COUNT(CASE WHEN hit = true THEN 1 END) as hits FROM public.signal_history")
         stats = cur.fetchone()
-        
         if stats and stats['total'] > 0:
             total_signals = stats['total']
             total_hits = stats['hits'] if stats['hits'] else 0
         else:
-            # AGAR DATABASE KHALI HAI TOH FALLBACK: Test stocks utha lo
-            raise Exception("DB is empty, fallback to mock data")
-            
+            raise Exception("DB Empty")
         cur.close()
         conn.close()
     except Exception as e:
-        # Fallback block agar database me data abhi na ho
         signals = MOCK_SIGNALS
         if signal_type:
             signals = [s for s in signals if s['signal_type'].upper() == signal_type.upper()]
@@ -157,7 +142,6 @@ def index():
             signals = [s for s in signals if s['direction'].upper() == direction.upper()]
         total_signals = len(signals)
         total_hits = len([s for s in signals if s.get('hit') is True])
-
     accuracy = round((total_hits / total_signals) * 100, 2) if total_signals > 0 else 0
     return render_template('dashboard.html', signals=signals, accuracy=accuracy, total=total_signals, hits=total_hits)
 
