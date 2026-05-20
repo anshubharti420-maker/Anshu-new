@@ -1,0 +1,19 @@
+services:
+  # 1. Cloud Database (PostgreSQL) jisme aapka signal_history data rahega
+  - type: database
+    name: anshu-screener-db
+    databaseName: heliumdb
+    user: postgres
+
+  # 2. Web App (Backend + Frontend) jo mobile par khulega
+  - type: web
+    name: anshu-stock-screener
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: anshu-screener-db
+          property: connectionString
+          
