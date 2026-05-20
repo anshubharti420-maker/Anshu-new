@@ -13,6 +13,14 @@ API_KEY = os.environ.get('UPSTOX_API_KEY')
 API_SECRET = os.environ.get('UPSTOX_API_SECRET')
 REDIRECT_URI = os.environ.get('UPSTOX_REDIRECT_URI', 'https://anshu-new-1.onrender.com/callback')
 
+# TEST STOCKS: Jab tak live market chal kar database me entries nahi aati, tab tak ye dikhenge
+MOCK_SIGNALS = [
+    {"symbol": "RELIANCE", "signal_type": "INTRADAY", "direction": "UP", "price_at_signal": 2450.0, "signal_date": "2026-05-21", "actual_change_pct": 1.5, "hit": True},
+    {"symbol": "TATASTEEL", "signal_type": "BTST", "direction": "UP", "price_at_signal": 164.2, "signal_date": "2026-05-21", "actual_change_pct": 2.1, "hit": True},
+    {"symbol": "HDFCBANK", "signal_type": "INTRADAY", "direction": "UP", "price_at_signal": 1510.5, "signal_date": "2026-05-21", "actual_change_pct": -0.4, "hit": False},
+    {"symbol": "SBIN", "signal_type": "BTST", "direction": "UP", "price_at_signal": 825.0, "signal_date": "2026-05-21", "actual_change_pct": 0.0, "hit": None}
+]
+
 def check_and_create_table():
     if not DATABASE_URL:
         return
@@ -43,7 +51,6 @@ def login_upstox():
     url = f"https://api.upstox.com/v2/login/authorization/dialog?client_id={API_KEY}&redirect_uri={REDIRECT_URI}&response_type=code"
     return redirect(url)
 
-# Built-in network calls to fetch live data without using 'requests' module
 @app.route('/callback')
 def callback():
     code = request.args.get('code')
@@ -60,7 +67,6 @@ def callback():
     }
     
     try:
-        # A. Upstox se Token lena (Bina requests library ke)
         encoded_data = urllib.parse.urlencode(data).encode('utf-8')
         req = urllib.request.Request(token_url, data=encoded_data, headers={'accept': 'application/json'})
         
@@ -71,8 +77,8 @@ def callback():
             if access_token:
                 check_and_create_table()
                 
-                # B. Real Live Data Fetch: Upstox se Quotes nikalna
-                stock_instruments = "NSE_EQ|INE002A01018,NSE_EQ|INE040A01034" # Reliance, HDFC Bank
+                # Upstox API se real-time data fetch karna
+                stock_instruments = "NSE_EQ|INE002A01018,NSE_EQ|INE040A01034"
                 quote_url = f'https://api.upstox.com/v2/market-quote/quotes?instrument_key={stock_instruments}'
                 
                 quote_req = urllib.request.Request(quote_url, headers={
@@ -93,7 +99,6 @@ def callback():
                             symbol_name = val.get('symbol')
                             last_price = val.get('last_price')
                             
-                            # Real Live entry saving into database
                             cur.execute("""
                                 INSERT INTO public.signal_history (symbol, signal_type, direction, price_at_signal, signal_date, hit)
                                 VALUES (%s, 'INTRADAY', 'UP', %s, NOW(), True);
@@ -133,14 +138,25 @@ def index():
         
         cur.execute("SELECT COUNT(*) as total, COUNT(CASE WHEN hit = true THEN 1 END) as hits FROM public.signal_history")
         stats = cur.fetchone()
+        
         if stats and stats['total'] > 0:
             total_signals = stats['total']
             total_hits = stats['hits'] if stats['hits'] else 0
+        else:
+            # AGAR DATABASE KHALI HAI TOH FALLBACK: Test stocks utha lo
+            raise Exception("DB is empty, fallback to mock data")
             
         cur.close()
         conn.close()
     except Exception as e:
-        print("Database load error:", e)
+        # Fallback block agar database me data abhi na ho
+        signals = MOCK_SIGNALS
+        if signal_type:
+            signals = [s for s in signals if s['signal_type'].upper() == signal_type.upper()]
+        if direction:
+            signals = [s for s in signals if s['direction'].upper() == direction.upper()]
+        total_signals = len(signals)
+        total_hits = len([s for s in signals if s.get('hit') is True])
 
     accuracy = round((total_hits / total_signals) * 100, 2) if total_signals > 0 else 0
     return render_template('dashboard.html', signals=signals, accuracy=accuracy, total=total_signals, hits=total_hits)
