@@ -9,8 +9,8 @@ from psycopg2.extras import RealDictCursor
 app = Flask(__name__)
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
-API_KEY = os.environ.get('UPSTOX_API_KEY')
-API_SECRET = os.environ.get('UPSTOX_API_SECRET')
+API_KEY = os.environ.get('878a60c5-afcc-4e01-8213-f03758ee3272')
+API_SECRET = os.environ.get('wjgohe75mz')
 REDIRECT_URI = os.environ.get('UPSTOX_REDIRECT_URI', 'https://anshu-new-1.onrender.com/callback')
 
 # TEST STOCKS: Jab tak live market chal kar database me entries nahi aati, tab tak ye dikhenge
@@ -48,7 +48,7 @@ def check_and_create_table():
 
 @app.route('/login-upstox')
 def login_upstox():
-    url = f"https://api.upstox.com/v2/login/authorization/dialog?client_id={API_KEY}&redirect_uri={REDIRECT_URI}&response_type=code"
+    url = f"https://api.upstox.com/v2/login/authorization/dialog?client_id={878a60c5-afcc-4e01-8213-f03758ee3272}&redirect_uri={https://anshu-new-1.onrender.com/callback}&response_type=code"
     return redirect(url)
 
 @app.route('/callback')
