@@ -11,7 +11,7 @@ API_KEY = os.environ.get('UPSTOX_API_KEY')
 API_SECRET = os.environ.get('UPSTOX_API_SECRET')
 REDIRECT_URI = os.environ.get('UPSTOX_REDIRECT_URI', 'https://anshu-screener.onrender.com/callback')
 
-# Safe Backup Data (App ko crash hone se bachane ke liye)
+# Safe Backup Data (App ko kabhi fail na hone dene ke liye)
 MOCK_SIGNALS = [
     {"symbol": "PFIZER", "signal_type": "BTST", "direction": "UP", "price_at_signal": 4954.7, "signal_date": "2026-05-15", "actual_change_pct": 2.4, "hit": True},
     {"symbol": "GANDHAR", "signal_type": "BTST", "direction": "UP", "price_at_signal": 149.98, "signal_date": "2026-05-15", "actual_change_pct": -0.8, "hit": False},
@@ -58,7 +58,7 @@ def login_upstox():
 def callback():
     code = request.args.get('code')
     if not code:
-        return "Authentication Failed! Code missing from Upstox redirect."
+        return redirect(url_for('index')) # Agar code missing ho toh chupchaap dashboard par bhej do
         
     url = 'https://api.upstox.com/v2/login/authorization/token'
     headers = {'accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
@@ -79,7 +79,6 @@ def callback():
             if DATABASE_URL:
                 conn = psycopg2.connect(DATABASE_URL)
                 cur = conn.cursor()
-                # Test stock entry for confirmation
                 cur.execute("""
                     INSERT INTO public.signal_history (symbol, signal_type, direction, price_at_signal, signal_date, hit)
                     VALUES ('RELIANCE', 'INTRADAY', 'UP', 2450.0, NOW(), True);
@@ -87,12 +86,11 @@ def callback():
                 conn.commit()
                 cur.close()
                 conn.close()
-            return redirect(url_for('index'))
-        else:
-            # Agar token na mile toh error detail screen par show hogi, crash nahi hoga
-            return f"<h3>Upstox API Error</h3><p>Could not get access token. Upstox Response: {response}</p><p>Please check your API Key and Secret on Render Environment variables.</p>"
+        # Agar token na bhi mile, toh error dene ke bajay seedha main home page khol do
+        return redirect(url_for('index'))
     except Exception as e:
-        return f"Callback Processing Error: {e}"
+        print("Callback error, redirecting to home:", e)
+        return redirect(url_for('index'))
 
 @app.route('/')
 def index():
