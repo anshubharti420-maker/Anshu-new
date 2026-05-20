@@ -12,7 +12,7 @@ app = Flask(__name__)
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 # 2. AAPKI LATEST PERMANENT FIXED UPSTOX KEYS
-API_KEY = '878a60c5-afcc-4e01-8213-f03758ee3722'
+API_KEY = '878a60c5-afcc-4e01-8213-f03758ee3272'
 API_SECRET = 'i1j86ouh44'  # <-- Aapki naye permanent Secret Key yahan lock kar di hai
 REDIRECT_URI = 'https://anshu-new-1.onrender.com/callback'
 
