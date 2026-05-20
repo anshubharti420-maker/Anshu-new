@@ -8,17 +8,22 @@ from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
 
+# 1. DATABASE URL Render se automatically load hoga
 DATABASE_URL = os.environ.get('DATABASE_URL')
-API_KEY = '878a60c5-afcc-4e01-8213-f03758ee3272'
-API_SECRET = '878a60c5-afcc-4e01-8213-f93758ee3272'
+
+# 2. AAPKI LATEST FIXED UPSTOX KEYS
+API_KEY = '878a60c5-afcc-4e01-8213-f03758ee3722'
+API_SECRET = '878a60c5-afcc-4e01-8213-f03758ee3272'  # <-- Aapki naye Secret Key yahan lock kar di hai
 REDIRECT_URI = 'https://anshu-new-1.onrender.com/callback'
 
-# PREMIUM MOCK DATA: Jab tak real cloud database me entry push nahi hoti, ye automatic pro table columns fill rakhega
+# Premium Segmented Cards Mock Model (BTST aur INTRADAY proper alignment ke sath)
 MOCK_SIGNALS = [
-    {"symbol": "RELIANCE", "timeframe": "15 MIN", "strategy": "CPR Breakout", "direction": "BUY", "price_at_signal": 2450.0, "ltp": 2478.5, "target1": 2475.0, "target2": 2500.0, "stop_loss": 2435.0, "hit": True},
-    {"symbol": "TATASTEEL", "timeframe": "5 MIN", "strategy": "EMA Crossover", "direction": "BUY", "price_at_signal": 164.2, "ltp": 168.5, "target1": 166.0, "target2": 170.0, "stop_loss": 162.5, "hit": True},
-    {"symbol": "HDFCBANK", "timeframe": "15 MIN", "strategy": "VWAP Rejection", "direction": "SELL", "price_at_signal": 1510.5, "ltp": 1515.0, "target1": 1495.0, "target2": 1480.0, "stop_loss": 1522.0, "hit": False},
-    {"symbol": "SBIN", "timeframe": "30 MIN", "strategy": "Inside Bar Pattern", "direction": "BUY", "price_at_signal": 825.0, "ltp": 826.4, "target1": 835.0, "target2": 845.0, "stop_loss": 818.0, "hit": None}
+    {"symbol": "TIRUMALCHM", "signal_type": "BTST", "timeframe": "DAILY", "strategy": "High Vol Breakout", "direction": "BUY", "price_at_signal": 212.08, "ltp": 214.50, "target1": 222.68, "stop_loss": 207.84},
+    {"symbol": "TEMBO", "signal_type": "BTST", "timeframe": "DAILY", "strategy": "Institutional Flow", "direction": "BUY", "price_at_signal": 592.95, "ltp": 596.10, "target1": 622.60, "stop_loss": 581.09},
+    {"symbol": "IOLCP", "signal_type": "BTST", "timeframe": "DAILY", "strategy": "Delivery Spike", "direction": "BUY", "price_at_signal": 119.54, "ltp": 121.20, "target1": 125.52, "stop_loss": 117.15},
+    {"symbol": "ASTRAMICRO", "signal_type": "INTRADAY", "timeframe": "15 MIN", "strategy": "CPR Breakout", "direction": "BUY", "price_at_signal": 1154.10, "ltp": 1159.00, "target1": 1177.18, "stop_loss": 1142.56},
+    {"symbol": "ABB", "signal_type": "INTRADAY", "timeframe": "5 MIN", "strategy": "EMA Cross Spike", "direction": "BUY", "price_at_signal": 6605.00, "ltp": 6624.00, "target1": 6737.10, "stop_loss": 6538.95},
+    {"symbol": "ERIS", "signal_type": "INTRADAY", "timeframe": "15 MIN", "strategy": "VWAP Rejection", "direction": "BUY", "price_at_signal": 1458.20, "ltp": 1462.00, "target1": 1487.36, "stop_loss": 1443.62}
 ]
 
 def check_and_create_table():
@@ -27,21 +32,18 @@ def check_and_create_table():
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
-        # Custom Advanced Database Schema
         cur.execute("""
             CREATE TABLE IF NOT EXISTS public.signal_history (
                 id SERIAL PRIMARY KEY,
                 symbol TEXT NOT NULL,
+                signal_type TEXT NOT NULL,
                 timeframe TEXT DEFAULT '15 MIN',
                 strategy TEXT DEFAULT 'Algo Scanner',
                 direction TEXT NOT NULL,
                 price_at_signal NUMERIC NOT NULL,
                 ltp NUMERIC,
                 target1 NUMERIC,
-                target2 NUMERIC,
                 stop_loss NUMERIC,
-                signal_date DATE DEFAULT NOW(),
-                hit BOOLEAN,
                 created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW() NOT NULL
             );
         """)
@@ -49,7 +51,7 @@ def check_and_create_table():
         cur.close()
         conn.close()
     except Exception as e:
-        print("Table Structure Upgrade Error:", e)
+        print("Table structure check error:", e)
 
 @app.route('/login-upstox')
 def login_upstox():
@@ -100,16 +102,16 @@ def callback():
                             symbol_name = val.get('symbol')
                             last_price = val.get('last_price')
                             
-                            # Advanced data insert matching our beautiful UI
+                            # Live server entry saving logic categorised as Intraday
                             cur.execute("""
-                                INSERT INTO public.signal_history (symbol, timeframe, strategy, direction, price_at_signal, ltp, target1, target2, stop_loss, hit)
-                                VALUES (%s, '15 MIN', 'Upstox Live Engine', 'BUY', %s, %s, %s, %s, %s, null);
-                            """, (symbol_name, last_price, last_price, last_price*1.01, last_price*1.02, last_price*0.995))
+                                INSERT INTO public.signal_history (symbol, signal_type, timeframe, strategy, direction, price_at_signal, ltp, target1, stop_loss)
+                                VALUES (%s, 'INTRADAY', '15 MIN', 'Upstox Active Flow', 'BUY', %s, %s, %s, %s);
+                            """, (symbol_name, last_price, last_price, last_price*1.01, last_price*0.995))
                         conn.commit()
                         cur.close()
                         conn.close()
     except Exception as e:
-        print("Live Upstox Streaming Error:", e)
+        print("Upstox connection failed:", e)
     return redirect(url_for('index'))
 
 @app.route('/api/refresh')
@@ -118,7 +120,7 @@ def api_refresh():
         check_and_create_table()
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
         cur = conn.cursor()
-        cur.execute("SELECT symbol, timeframe, strategy, direction, price_at_signal, ltp, target1, target2, stop_loss, hit FROM public.signal_history ORDER BY id DESC LIMIT 50")
+        cur.execute("SELECT symbol, signal_type, timeframe, strategy, direction, price_at_signal, ltp, target1, stop_loss FROM public.signal_history ORDER BY id DESC LIMIT 50")
         signals = cur.fetchall()
         cur.close()
         conn.close()
