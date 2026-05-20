@@ -11,7 +11,7 @@ API_KEY = os.environ.get('UPSTOX_API_KEY')
 API_SECRET = os.environ.get('UPSTOX_API_SECRET')
 REDIRECT_URI = os.environ.get('UPSTOX_REDIRECT_URI', 'https://anshu-screener.onrender.com/callback')
 
-# Safe Backup Data (Jab tak database me naya data nahi aata, tab tak yeh dikhega taki app crash na ho)
+# Safe Backup Data
 MOCK_SIGNALS = [
     {"symbol": "PFIZER", "signal_type": "BTST", "direction": "UP", "price_at_signal": 4954.7, "signal_date": "2026-05-15", "actual_change_pct": 2.4, "hit": True},
     {"symbol": "GANDHAR", "signal_type": "BTST", "direction": "UP", "price_at_signal": 149.98, "signal_date": "2026-05-15", "actual_change_pct": -0.8, "hit": False},
@@ -23,6 +23,9 @@ MOCK_SIGNALS = [
 
 def check_and_create_table():
     """Yeh function automatic database me table bana dega agar nahi bana hoga toh"""
+    if not DATABASE_URL:
+        print("DATABASE_URL is not set.")
+        return
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
@@ -73,11 +76,11 @@ def callback():
         access_token = response.get('access_token')
         
         if access_token:
-            check_and_create_table() # Token milte hi table structure double check karega
+            check_and_create_table()
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             
-            # Upstox Login hote hi ek test signal entry add karega confirmation ke liye
+            # Test signal entry to confirm connection works
             cur.execute("""
                 INSERT INTO public.signal_history (symbol, signal_type, direction, price_at_signal, signal_date, hit)
                 VALUES ('RELIANCE', 'INTRADAY', 'UP', 2450.0, NOW(), True);
@@ -100,7 +103,7 @@ def index():
     total_signals, total_hits, accuracy = 0, 0, 0
     
     try:
-        check_and_create_table() # Pehle insure karega ki table bana hai
+        check_and_create_table()
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
         cur = conn.cursor()
         
@@ -125,8 +128,7 @@ def index():
         conn.close()
         
     except Exception as e:
-        print("Database khali hai ya error hai, backup data loading...", e)
-        # Agar cloud DB me koi dikat aaye toh app crash hone ke bajay safe data dikhayega
+        print("Database error, loading fallback mock data:", e)
         signals = MOCK_SIGNALS
         if signal_type:
             signals = [s for s in signals if s['signal_type'] == signal_type]
