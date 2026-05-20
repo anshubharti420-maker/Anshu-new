@@ -1,139 +1,188 @@
-import os
-import json
-import urllib.request
-import urllib.parse
-from flask import Flask, render_template, request, redirect, url_for, jsonify
-import psycopg2
-from psycopg2.extras import RealDictCursor
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anshu Pro Algo Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-[#0f172a] text-slate-100 min-h-screen pb-12">
 
-app = Flask(__name__)
-
-# 1. DATABASE URL Render se automatically load hoga
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
-# 2. AAPKI ASLI LIVE UPSTOX KEYS DIRECTLY CONNECTED
-API_KEY = '878a60c5-afcc-4e01-8213-f03758ee3722'
-API_SECRET = '878a60c5-afcc-4e01-8213-f03758ee3272'  # <-- Aapki Secret Key yahan fix kar di hai
-REDIRECT_URI = 'https://anshu-new-1.onrender.com/callback'
-
-# Safe Backup Data (Agar database khali ho toh dashboard crash na ho)
-MOCK_SIGNALS = [
-    {"symbol": "RELIANCE", "signal_type": "INTRADAY", "direction": "UP", "price_at_signal": 2450.0, "signal_date": "2026-05-21", "actual_change_pct": 1.5, "hit": True},
-    {"symbol": "TATASTEEL", "signal_type": "BTST", "direction": "UP", "price_at_signal": 164.2, "signal_date": "2026-05-21", "actual_change_pct": 2.1, "hit": True},
-    {"symbol": "HDFCBANK", "signal_type": "INTRADAY", "direction": "UP", "price_at_signal": 1510.5, "signal_date": "2026-05-21", "actual_change_pct": -0.4, "hit": False},
-    {"symbol": "SBIN", "signal_type": "BTST", "direction": "UP", "price_at_signal": 825.0, "signal_date": "2026-05-21", "actual_change_pct": 0.0, "hit": None}
-]
-
-def check_and_create_table():
-    if not DATABASE_URL:
-        return
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS public.signal_history (
-                id SERIAL PRIMARY KEY,
-                symbol TEXT NOT NULL,
-                signal_type TEXT NOT NULL,
-                direction TEXT NOT NULL,
-                price_at_signal NUMERIC NOT NULL,
-                signal_date DATE NOT NULL,
-                actual_change_pct NUMERIC,
-                hit BOOLEAN,
-                created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW() NOT NULL
-            );
-        """)
-        conn.commit()
-        cur.close()
-        conn.close()
-    except Exception as e:
-        print("Table Creation Error:", e)
-
-# ➡️ UPSTOX LOGIN ROUTE
-@app.route('/login-upstox')
-def login_upstox():
-    url = f"https://api.upstox.com/v2/login/authorization/dialog?client_id={API_KEY}&redirect_uri={REDIRECT_URI}&response_type=code"
-    return redirect(url)
-
-# ➡️ UPSTOX CALLBACK ROUTE (Token lekar live data insert karega)
-@app.route('/callback')
-def callback():
-    code = request.args.get('code')
-    if not code:
-        return redirect(url_for('index'))
-        
-    token_url = 'https://api.upstox.com/v2/login/authorization/token'
-    data = {
-        'code': code,
-        'client_id': API_KEY,
-        'client_secret': API_SECRET,
-        'redirect_uri': REDIRECT_URI,
-        'grant_type': 'authorization_code'
-    }
-    
-    try:
-        encoded_data = urllib.parse.urlencode(data).encode('utf-8')
-        req = urllib.request.Request(token_url, data=encoded_data, headers={'accept': 'application/json'})
-        
-        with urllib.request.urlopen(req) as response:
-            res = json.loads(response.read().decode('utf-8'))
-            access_token = res.get('access_token')
+    <header class="bg-[#1e293b]/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="relative flex h-3 w-3">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </div>
+                <div>
+                    <h1 class="text-lg font-extrabold tracking-wider bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">ANSHU ALGO LABS</h1>
+                    <p class="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Institutional Scanner</p>
+                </div>
+            </div>
             
-            if access_token:
-                check_and_create_table()
+            <div class="flex items-center space-x-3">
+                <a href="/login-upstox" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center space-x-2 transition-all shadow-lg active:scale-95">
+                    <i class="fa-solid fa-key"></i>
+                    <span>Connect Upstox</span>
+                </a>
                 
-                # Upstox API se live market price fetch karna
-                stock_instruments = "NSE_EQ|INE002A01018,NSE_EQ|INE040A01034" # Reliance & HDFC Bank
-                quote_url = f'https://api.upstox.com/v2/market-quote/quotes?instrument_key={stock_instruments}'
+                <button onclick="refreshDashboard()" id="refreshBtn" class="bg-[#334155] hover:bg-slate-600 text-slate-200 font-semibold px-4 py-2 rounded-xl flex items-center space-x-2 transition-all border border-slate-700 shadow-md active:scale-95">
+                    <i class="fa-solid fa-arrows-rotate" id="refreshIcon"></i>
+                    <span class="text-xs">Refresh Data</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
+            <div class="bg-[#1e293b] p-5 rounded-2xl border border-slate-800/80 shadow-lg relative overflow-hidden group">
+                <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Win Rate Accuracy</p>
+                        <p class="text-3xl font-black text-emerald-400 mt-2" id="accuracyBox">0%</p>
+                    </div>
+                    <div class="p-3 bg-emerald-500/10 rounded-xl text-emerald-400"><i class="fa-solid fa-chart-line text-xl"></i></div>
+                </div>
+            </div>
+
+            <div class="bg-[#1e293b] p-5 rounded-2xl border border-slate-800/80 shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Target Achieved</p>
+                        <p class="text-3xl font-black text-cyan-400 mt-2" id="hitsBox">0</p>
+                    </div>
+                    <div class="p-3 bg-cyan-500/10 rounded-xl text-cyan-400"><i class="fa-solid fa-bullseye text-xl"></i></div>
+                </div>
+            </div>
+
+            <div class="bg-[#1e293b] p-5 rounded-2xl border border-slate-800/80 shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Trades</p>
+                        <p class="text-3xl font-black text-amber-400 mt-2" id="activeBox">0</p>
+                    </div>
+                    <div class="p-3 bg-amber-500/10 rounded-xl text-amber-400"><i class="fa-solid fa-hourglass-half text-xl"></i></div>
+                </div>
+            </div>
+
+            <div class="bg-[#1e293b] p-5 rounded-2xl border border-slate-800/80 shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Bot Signals</p>
+                        <p class="text-3xl font-black text-indigo-400 mt-2" id="totalBox">0</p>
+                    </div>
+                    <div class="p-3 bg-indigo-500/10 rounded-xl text-indigo-400"><i class="fa-solid fa-robot text-xl"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-[#1e293b] rounded-2xl border border-slate-800/80 shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 bg-[#161e2e] border-b border-slate-800 flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-bolt text-amber-400 animate-pulse"></i>
+                    <h3 class="font-bold text-slate-200 tracking-wide">Live Algorithmic Order Flow</h3>
+                </div>
+                <span class="text-[11px] font-bold px-2.5 py-1 rounded-md bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider">Segment: NSE Cash / F&O</span>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse whitespace-nowrap">
+                    <thead>
+                        <tr class="bg-[#0f172a]/60 text-slate-400 text-xs uppercase font-bold border-b border-slate-800 tracking-wider">
+                            <th class="p-4 pl-6">Script / Token</th>
+                            <th class="p-4">Strategy</th>
+                            <th class="p-4">Type</th>
+                            <th class="p-4">Entry Price</th>
+                            <th class="p-4">Live LTP</th>
+                            <th class="p-4">Target 1</th>
+                            <th class="p-4">Target 2</th>
+                            <th class="p-4">Stop Loss</th>
+                            <th class="p-4 pr-6 text-center">Trade Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="signalsTableBody" class="divide-y divide-slate-800 text-sm">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function refreshDashboard() {
+            const btn = document.getElementById('refreshBtn');
+            const icon = document.getElementById('refreshIcon');
+            icon.classList.add('fa-spin');
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/refresh');
+                const result = await response.json();
                 
-                quote_req = urllib.request.Request(quote_url, headers={
-                    'accept': 'application/json',
-                    'Authorization': f'Bearer {access_token}'
-                })
-                
-                with urllib.request.urlopen(quote_req) as quote_response:
-                    market_data = json.loads(quote_response.read().decode('utf-8'))
-                    if market_data.get('status') == 'success' and DATABASE_URL:
-                        data_body = market_data.get('data', {})
-                        conn = psycopg2.connect(DATABASE_URL)
-                        cur = conn.cursor()
+                if (result.status === 'success') {
+                    const tbody = document.getElementById('signalsTableBody');
+                    tbody.innerHTML = '';
+                    
+                    let total = result.signals.length;
+                    let hits = 0;
+                    let active = 0;
+                    
+                    result.signals.forEach(stock => {
+                        if(stock.hit === true) hits++;
+                        if(stock.hit === null) active++;
                         
-                        for key, val in data_body.items():
-                            symbol_name = val.get('symbol')
-                            last_price = val.get('last_price')
-                            
-                            # Database me live entry push ho rahi hai
-                            cur.execute("""
-                                INSERT INTO public.signal_history (symbol, signal_type, direction, price_at_signal, signal_date, hit)
-                                VALUES (%s, 'INTRADAY', 'UP', %s, NOW(), True);
-                            """, (symbol_name, last_price))
-                        conn.commit()
-                        cur.close()
-                        conn.close()
-    except Exception as e:
-        print("Error processing live data via Upstox:", e)
-    return redirect(url_for('index'))
+                        // Dynamic Badges UI customization
+                        let badgeColor = stock.hit === true ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : (stock.hit === false ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20');
+                        let badgeText = stock.hit === true ? 'TARGET DONE ✅' : (stock.hit === false ? 'SL HIT ❌' : 'LIVE RUNNING ⏳');
+                        
+                        let typeColor = stock.direction.toUpperCase() === 'BUY' || stock.direction.toUpperCase() === 'UP' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400';
+                        let typeText = stock.direction.toUpperCase() === 'BUY' || stock.direction.toUpperCase() === 'UP' ? 'BUY 🟢' : 'SELL 🔴';
 
-# 🔄 REFRESH BUTTON API LINK
-@app.route('/api/refresh')
-def api_refresh():
-    try:
-        check_and_create_table()
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-        cur = conn.cursor()
-        cur.execute("SELECT symbol, signal_type, direction, price_at_signal, signal_date, actual_change_pct, hit FROM public.signal_history ORDER BY id DESC LIMIT 50")
-        signals = cur.fetchall()
-        cur.close()
-        conn.close()
-        if not signals:
-            return jsonify({"status": "success", "signals": MOCK_SIGNALS})
-        return jsonify({"status": "success", "signals": signals})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e), "signals": MOCK_SIGNALS})
+                        tbody.innerHTML += `
+                            <tr class="hover:bg-slate-800/50 transition-colors group">
+                                <td class="p-4 pl-6">
+                                    <div class="font-bold text-slate-100">${stock.symbol}</div>
+                                    <div class="text-[10px] text-slate-400 font-semibold tracking-wider">${stock.timeframe || '15 MIN'}</div>
+                                </td>
+                                <td class="p-4 font-medium text-slate-300">${stock.strategy || 'CPR + Breakout'}</td>
+                                <td class="p-4"><span class="px-2 py-0.5 rounded-md text-xs font-extrabold ${typeColor}">${typeText}</span></td>
+                                <td class="p-4 font-mono font-semibold text-slate-200">₹${parseFloat(stock.price_at_signal).toFixed(2)}</td>
+                                <td class="p-4 font-mono font-bold text-cyan-400 animate-pulse">₹${parseFloat(stock.ltp || stock.price_at_signal).toFixed(2)}</td>
+                                <td class="p-4 font-mono text-emerald-400 font-medium">₹${parseFloat(stock.target1 || (stock.price_at_signal * 1.01)).toFixed(2)}</td>
+                                <td class="p-4 font-mono text-emerald-300 font-medium">₹${parseFloat(stock.target2 || (stock.price_at_signal * 1.02)).toFixed(2)}</td>
+                                <td class="p-4 font-mono text-rose-400 font-medium">₹${parseFloat(stock.stop_loss || (stock.price_at_signal * 0.995)).toFixed(2)}</td>
+                                <td class="p-4 pr-6 text-center"><span class="px-3 py-1 rounded-xl text-xs font-bold ${badgeColor}">${badgeText}</span></td>
+                            </tr>
+                        `;
+                    });
 
-@app.route('/')
-def index():
-    return render_template('dashboard.html')
+                    document.getElementById('totalBox').innerText = total;
+                    document.getElementById('hitsBox').innerText = hits;
+                    document.getElementById('activeBox').innerText = active;
+                    document.getElementById('accuracyBox').innerText = total > 0 ? (Math.round((hits / (total - active || 1)) * 100)) + '%' : '0%';
+                }
+            } catch (error) {
+                console.error("Dashboard API Loading Error:", error);
+            } finally {
+                setTimeout(() => {
+                    icon.classList.remove('fa-spin');
+                    btn.disabled = false;
+                }, 600);
+            }
+        }
 
-if __name__ == '__main__':
-    app.run()
+        window.onload = refreshDashboard;
+    </script>
+</body>
+</html>
