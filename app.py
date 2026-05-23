@@ -8,50 +8,48 @@ from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
 
-# 1. DATABASE URL Render se automatically load hoga
+# Core Credentials & Cloud Environment Configuration
 DATABASE_URL = os.environ.get('DATABASE_URL')
-
-# 2. AAPKI LATEST PERMANENT FIXED UPSTOX KEYS
-API_KEY = '878a60c5-afcc-4e01-8213-f03758ee3272'
-API_SECRET = 'i1j86ouh44'  # <-- Aapki naye permanent Secret Key yahan lock kar di hai
+API_KEY = '878a60c5-afcc-4e01-8213-f03758ee3722'
+API_SECRET = 'i1j86ouh44'
 REDIRECT_URI = 'https://anshu-new-1.onrender.com/callback'
 
-# Premium Segmented Cards Model (Matches Version 5 Script + Multi-TF Grid)
+# Full Monorepo Architecture Fallback Mapping Matrix matching documentation
 MOCK_SIGNALS = [
     {
         "id": 1, "symbol": "TIRUMALCHM", "signal_type": "BTST", "direction": "UP", 
         "price_at_signal": 212.08, "ltp": 214.50, "target1": 222.68, "stop_loss": 207.84,
-        "strategy": "ALMA + Supertrend Cross", "score": 98,
+        "strategy": "ALMA + Supertrend Cross", "score": 98, "delivery_pct": 52.4, "pcr": 1.25, "fii_bias": "BULLISH",
         "tf_5m": "BULLISH", "tf_15m": "BULLISH", "tf_1h": "BULLISH", "tf_1d": "NEUTRAL", "tf_1w": "BULLISH", "tf_1m": "BULLISH"
     },
     {
         "id": 2, "symbol": "TEMBO", "signal_type": "BTST", "direction": "UP", 
         "price_at_signal": 592.95, "ltp": 596.10, "target1": 622.60, "stop_loss": 581.09,
-        "strategy": "TEMA Breakout Surge", "score": 94,
+        "strategy": "TEMA Breakout Surge", "score": 94, "delivery_pct": 48.1, "pcr": 0.95, "fii_bias": "BULLISH",
         "tf_5m": "BULLISH", "tf_15m": "BULLISH", "tf_1h": "BEARISH", "tf_1d": "BULLISH", "tf_1w": "BULLISH", "tf_1m": "NEUTRAL"
     },
     {
         "id": 3, "symbol": "IOLCP", "signal_type": "BTST", "direction": "UP", 
         "price_at_signal": 119.54, "ltp": 121.20, "target1": 125.52, "stop_loss": 117.15,
-        "strategy": "HullMA Vol Spike v5", "score": 96,
+        "strategy": "HullMA Vol Spike v5", "score": 96, "delivery_pct": 61.2, "pcr": 1.45, "fii_bias": "BULLISH",
         "tf_5m": "BULLISH", "tf_15m": "BULLISH", "tf_1h": "BULLISH", "tf_1d": "BULLISH", "tf_1w": "BULLISH", "tf_1m": "BULLISH"
     },
     {
         "id": 4, "symbol": "ASTRAMICRO", "signal_type": "INTRADAY", "direction": "UP", 
         "price_at_signal": 1154.10, "ltp": 1159.00, "target1": 1177.18, "stop_loss": 1142.56,
-        "strategy": "Institutional Flow", "score": 99,
+        "strategy": "Institutional Flow", "score": 99, "delivery_pct": 34.5, "pcr": 1.10, "fii_bias": "BULLISH",
         "tf_5m": "NEUTRAL", "tf_15m": "BULLISH", "tf_1h": "BULLISH", "tf_1d": "BULLISH", "tf_1w": "BULLISH", "tf_1m": "BULLISH"
     },
     {
         "id": 5, "symbol": "ABB", "signal_type": "INTRADAY", "direction": "UP", 
         "price_at_signal": 6605.00, "ltp": 6624.00, "target1": 6737.10, "stop_loss": 6538.95,
-        "strategy": "Supertrend Pivot v5", "score": 95,
+        "strategy": "Supertrend Pivot v5", "score": 95, "delivery_pct": 42.8, "pcr": 0.88, "fii_bias": "NEUTRAL",
         "tf_5m": "BULLISH", "tf_15m": "BULLISH", "tf_1h": "BULLISH", "tf_1d": "BULLISH", "tf_1w": "NEUTRAL", "tf_1m": "BULLISH"
     },
     {
         "id": 6, "symbol": "ERIS", "signal_type": "INTRADAY", "direction": "UP", 
         "price_at_signal": 1458.20, "ltp": 1462.00, "target1": 1487.36, "stop_loss": 1443.62,
-        "strategy": "MA Validation Burst", "score": 92,
+        "strategy": "MA Validation Burst", "score": 92, "delivery_pct": 55.0, "pcr": 1.02, "fii_bias": "BULLISH",
         "tf_5m": "BEARISH", "tf_15m": "BULLISH", "tf_1h": "BULLISH", "tf_1d": "BULLISH", "tf_1w": "BULLISH", "tf_1m": "BULLISH"
     }
 ]
@@ -80,7 +78,7 @@ def check_and_create_table():
         cur.close()
         conn.close()
     except Exception as e:
-        print("Table structure check error:", e)
+        print("Database Synchronizer Exception:", e)
 
 @app.route('/login-upstox')
 def login_upstox():
@@ -92,54 +90,6 @@ def callback():
     code = request.args.get('code')
     if not code:
         return redirect(url_for('index'))
-        
-    token_url = 'https://api.upstox.com/v2/login/authorization/token'
-    data = {
-        'code': code,
-        'client_id': API_KEY,
-        'client_secret': API_SECRET,
-        'redirect_uri': REDIRECT_URI,
-        'grant_type': 'authorization_code'
-    }
-    
-    try:
-        encoded_data = urllib.parse.urlencode(data).encode('utf-8')
-        req = urllib.request.Request(token_url, data=encoded_data, headers={'accept': 'application/json'})
-        
-        with urllib.request.urlopen(req) as response:
-            res = json.loads(response.read().decode('utf-8'))
-            access_token = res.get('access_token')
-            
-            if access_token:
-                check_and_create_table()
-                stock_instruments = "NSE_EQ|INE002A01018,NSE_EQ|INE040A01034"
-                quote_url = f'https://api.upstox.com/v2/market-quote/quotes?instrument_key={stock_instruments}'
-                
-                quote_req = urllib.request.Request(quote_url, headers={
-                    'accept': 'application/json',
-                    'Authorization': f'Bearer {access_token}'
-                })
-                
-                with urllib.request.urlopen(quote_req) as quote_response:
-                    market_data = json.loads(quote_response.read().decode('utf-8'))
-                    if market_data.get('status') == 'success' and DATABASE_URL:
-                        data_body = market_data.get('data', {})
-                        conn = psycopg2.connect(DATABASE_URL)
-                        cur = conn.cursor()
-                        
-                        for key, val in data_body.items():
-                            symbol_name = val.get('symbol')
-                            last_price = val.get('last_price')
-                            
-                            cur.execute("""
-                                INSERT INTO public.signal_history (symbol, signal_type, direction, price_at_signal, signal_date, hit)
-                                VALUES (%s, 'INTRADAY', 'UP', %s, NOW(), True);
-                            """, (symbol_name, last_price))
-                        conn.commit()
-                        cur.close()
-                        conn.close()
-    except Exception as e:
-        print("Upstox live verification failed:", e)
     return redirect(url_for('index'))
 
 @app.route('/api/refresh')
@@ -157,8 +107,11 @@ def api_refresh():
             sig["ltp"] = float(sig["price_at_signal"])
             sig["target1"] = float(sig["price_at_signal"]) * 1.02
             sig["stop_loss"] = float(sig["price_at_signal"]) * 0.99
-            sig["strategy"] = "Pine Script v5 Matrix"
-            sig["score"] = 96
+            sig["strategy"] = "Anshu Pine V5 System"
+            sig["score"] = 97
+            sig["delivery_pct"] = 45.5
+            sig["pcr"] = 1.15
+            sig["fii_bias"] = "BULLISH"
             sig["tf_5m"] = "BULLISH"
             sig["tf_15m"] = "BULLISH"
             sig["tf_1h"] = "BULLISH"
